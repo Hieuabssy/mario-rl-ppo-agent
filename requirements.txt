@@ -1,0 +1,11 @@
+gym==0.21.0
+gym-super-mario-bros==7.4.0
+nes-py==8.2.1
+torch==2.0.1+cu118
+torchvision==0.15.2+cu118
+torchaudio==2.0.2+cu118
+stable-baselines3[extra]
+opencv-python==4.8.1.78  
+matplotlib==3.7.5
+numpy==1.24.4
+pillow==10.4.0
