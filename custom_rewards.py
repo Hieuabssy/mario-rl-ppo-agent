@@ -1,7 +1,3 @@
-"""
-Custom Reward Wrapper cho Super Mario Bros
-Tăng cường reward để Mario học tốt hơn
-"""
 
 import gym
 import numpy as np
@@ -9,52 +5,49 @@ import numpy as np
 
 class CustomRewardWrapper(gym.Wrapper):
     """
-    Custom reward wrapper kết hợp với reward gốc từ gym_super_mario_bros
+    Custom reward wrapper that combines with the original reward from gym_super_mario_bros.
     
-    Reward gốc của gym_super_mario_bros:
-    - Di chuyển sang phải: +1 mỗi pixel
-    - Ăn coin: +50
-    - Giết enemy: +100-500
-    - Cắm cờ: +5000
-    - Chết: -15
+    Original rewards from gym_super_mario_bros:
+    - Moving to the right: +1 per pixel
+    - Collecting a coin: +50
+    - Killing an enemy: +100-500
+    - Reaching the flagpole: +5000
+    - Dying: -15
     
-    Custom reward thêm vào:
-    - Di chuyển nhanh sang phải: bonus
-    - Chết: phạt nặng hơn
-    - Đứng yên/di chuyển chậm: phạt nhẹ
+    Additional custom rewards:
+    - Bonus for moving quickly to the right
+    - Heavier penalty for dying
+    - Slight penalty for standing still or moving slowly
     """
-    
+    # ================================================================
+    # CUSTOM REWARD CONFIGURATION - CUSTOMIZE HERE
+    # ================================================================   
     def __init__(self, env):
         super(CustomRewardWrapper, self).__init__(env)
         
-        # ================================================================
-        # CẤU HÌNH CUSTOM REWARD - TÙY CHỈNH TẠI ĐÂY
-        # ================================================================
+
         
-        # Reward cho việc di chuyển nhanh
-        self.speed_reward_multiplier = 0.5  # Nhân với tốc độ di chuyển
-        self.min_speed_threshold = 5        # Tốc độ tối thiểu để được thưởng
+        # Reward for moving fast
+        self.speed_reward_multiplier = 0.5  
+        self.min_speed_threshold = 5        
         
-        # Penalty cho việc chết
-        self.death_penalty = -50            # Phạt thêm khi chết (gốc là -15)
+        # Penalty for dying
+        self.death_penalty = -50            
         
-        # Penalty cho việc đứng yên
-        self.idle_penalty = -0.1            # Phạt mỗi frame đứng yên
-        self.idle_threshold = 2             # Nếu di chuyển < 2 pixel = đứng yên
+        # Penalty for standing still
+        self.idle_penalty = -0.1            
+        self.idle_threshold = 2             
+
+        # Bonus for advancing far
+        self.distance_bonus_multiplier = 1.5  
         
-        # Bonus cho việc tiến xa
-        self.distance_bonus_multiplier = 1.5  # Nhân với khoảng cách di chuyển
-        
-        # ================================================================
-        
-        # Tracking variables
         self.prev_x_pos = 0
         self.prev_time = 400
         self.stuck_counter = 0
-        self.max_x_pos = 0  # Vị trí xa nhất từng đạt được
+        self.max_x_pos = 0  
         
     def reset(self, **kwargs):
-        """Reset môi trường và các biến tracking"""
+        
         obs = self.env.reset(**kwargs)
         self.prev_x_pos = 0
         self.prev_time = 400
@@ -63,59 +56,56 @@ class CustomRewardWrapper(gym.Wrapper):
         return obs
     
     def step(self, action):
-        """
-        Thực hiện action và tính custom reward
-        """
+        
         obs, reward, done, info = self.env.step(action)
         
-        # Lấy thông tin từ game
+        # Get information from the game
         current_x_pos = info.get('x_pos', 0)
         current_time = info.get('time', 400)
-        is_dead = info.get('life', 2) < 2  # Life giảm = chết
+        is_dead = info.get('life', 2) < 2  # A decrease in life means death
         
         # ============================================================
-        # TÍNH CUSTOM REWARD
+        # CALCULATE CUSTOM REWARD
         # ============================================================
         custom_reward = 0
         
-        # 1. REWARD CHO DI CHUYỂN NHANH SANG PHẢI
+        # 1. REWARD FOR MOVING QUICKLY TO THE RIGHT
         x_delta = current_x_pos - self.prev_x_pos
         
         if x_delta > self.min_speed_threshold:
-            # Di chuyển nhanh → thưởng
+            # Moving fast -> reward
             speed_bonus = x_delta * self.speed_reward_multiplier
             custom_reward += speed_bonus
             self.stuck_counter = 0  # Reset counter
             
-            # Bonus thêm nếu đạt vị trí xa nhất
+            # Additional bonus if the furthest position is reached
             if current_x_pos > self.max_x_pos:
                 distance_bonus = (current_x_pos - self.max_x_pos) * self.distance_bonus_multiplier
                 custom_reward += distance_bonus
                 self.max_x_pos = current_x_pos
                 
         elif x_delta <= self.idle_threshold:
-            # 2. PENALTY CHO ĐỨNG YÊN / DI CHUYỂN CHẬM
+            # 2. PENALTY FOR STANDING STILL / MOVING SLOWLY
             custom_reward += self.idle_penalty
             self.stuck_counter += 1
             
-            # Phạt nặng hơn nếu đứng yên quá lâu
-            if self.stuck_counter > 50:  # Đứng yên > 50 frames
+            # Heavier penalty if idle for too long
+            if self.stuck_counter > 50:  # Idle > 50 frames
                 custom_reward += self.idle_penalty * 2
             
-            if self.stuck_counter > 100:  # Đứng yên > 100 frames
+            if self.stuck_counter > 100:  # Idle > 100 frames
                 custom_reward += self.idle_penalty * 5
         
-        # 3. PENALTY NẶNG CHO CHẾT
+        # 3. HEAVY PENALTY FOR DEATH
         if is_dead:
             custom_reward += self.death_penalty
         
-        # 4. PENALTY NHẸ CHO THỜI GIAN TRÔ
-        # (Khuyến khích hoàn thành nhanh)
+        # 4. SLIGHT PENALTY FOR TIME PASSING
         time_penalty = -0.01 if current_time < self.prev_time else 0
         custom_reward += time_penalty
         
         # ============================================================
-        # KẾT HỢP REWARD GỐC VÀ CUSTOM REWARD
+        # COMBINE ORIGINAL REWARD AND CUSTOM REWARD
         # ============================================================
         final_reward = reward + custom_reward
         
@@ -123,7 +113,7 @@ class CustomRewardWrapper(gym.Wrapper):
         self.prev_x_pos = current_x_pos
         self.prev_time = current_time
         
-        # Debug info (optional - comment out nếu không cần)
+        # Debug info (optional - comment out if not needed)
         info['custom_reward'] = custom_reward
         info['original_reward'] = reward
         info['x_delta'] = x_delta
@@ -131,38 +121,33 @@ class CustomRewardWrapper(gym.Wrapper):
         return obs, final_reward, done, info
 
 
-class DetailedRewardWrapper(gym.Wrapper):
-    """
-    Wrapper nâng cao với reward system chi tiết hơn
-    Dành cho những ai muốn kiểm soát tốt hơn
-    """
-    
+class DetailedRewardWrapper(gym.Wrapper):   
     def __init__(self, env, config=None):
         super(DetailedRewardWrapper, self).__init__(env)
         
-        # Default configuration
+        
         default_config = {
             # Movement rewards
-            'right_movement_bonus': 1.0,      # Bonus khi di chuyển phải
-            'fast_movement_bonus': 2.0,       # Bonus khi di chuyển rất nhanh
-            'fast_threshold': 10,             # Ngưỡng để được coi là "nhanh"
+            'right_movement_bonus': 1.0,      # Bonus for moving right
+            'fast_movement_bonus': 2.0,       # Bonus for moving very fast
+            'fast_threshold': 10,             # Threshold to be considered "fast"
             
             # Penalties
-            'death_penalty': -100,            # Phạt khi chết
-            'idle_penalty': -0.5,             # Phạt khi đứng yên
-            'backward_penalty': -1.0,         # Phạt khi đi lùi
-            'time_penalty': -0.01,            # Phạt theo thời gian
+            'death_penalty': -100,            # Penalty for dying
+            'idle_penalty': -0.5,             # Penalty for being idle
+            'backward_penalty': -1.0,         # Penalty for moving backward
+            'time_penalty': -0.01,            # Penalty over time
             
             # Progress rewards
-            'new_area_bonus': 5.0,            # Bonus khi đến vùng mới
-            'checkpoint_bonus': 10.0,         # Bonus tại các checkpoint
+            'new_area_bonus': 5.0,            # Bonus for reaching a new area
+            'checkpoint_bonus': 10.0,         # Bonus at checkpoints
             
             # Thresholds
-            'idle_threshold': 1,              # Ngưỡng coi là đứng yên
-            'stuck_threshold': 50,            # Số frame để coi là "stuck"
+            'idle_threshold': 1,              # Threshold to be considered idle
+            'stuck_threshold': 50,            # Number of frames to be considered "stuck"
         }
         
-        # Merge với config người dùng
+        # Merge with user config
         self.config = {**default_config, **(config or {})}
         
         # Tracking
@@ -250,21 +235,21 @@ class DetailedRewardWrapper(gym.Wrapper):
 
 
 # ============================================================================
-# HELPER FUNCTION - Tạo môi trường với custom reward
+# HELPER FUNCTION - Create an environment with custom rewards
 # ============================================================================
 
 def create_mario_env_with_custom_reward(world, stage, reward_type='custom', reward_config=None):
     """
-    Tạo môi trường Mario với custom reward wrapper
+    Creates a Mario environment with a custom reward wrapper.
     
     Args:
         world: World number (1-8)
         stage: Stage number (1-4)
-        reward_type: 'custom' hoặc 'detailed'
-        reward_config: Dict cấu hình cho DetailedRewardWrapper (optional)
+        reward_type: 'custom' or 'detailed'
+        reward_config: Dict for DetailedRewardWrapper configuration (optional)
     
     Returns:
-        env: Môi trường đã được wrap
+        env: The wrapped environment
     """
     import gym_super_mario_bros
     from nes_py.wrappers import JoypadSpace
@@ -276,13 +261,13 @@ def create_mario_env_with_custom_reward(world, stage, reward_type='custom', rewa
     env = gym_super_mario_bros.make(env_name)
     env = JoypadSpace(env, SIMPLE_MOVEMENT)
     
-    # Apply custom reward wrapper TRƯỚC khi grayscale
+    # Apply custom reward wrapper BEFORE grayscale
     if reward_type == 'custom':
         env = CustomRewardWrapper(env)
     elif reward_type == 'detailed':
         env = DetailedRewardWrapper(env, reward_config)
     
-    # Tiếp tục với preprocessing
+    # Continue with preprocessing
     env = GrayScaleObservation(env, keep_dim=True)
     env = DummyVecEnv([lambda: env])
     env = VecFrameStack(env, 4, channels_order='last')
@@ -291,7 +276,7 @@ def create_mario_env_with_custom_reward(world, stage, reward_type='custom', rewa
 
 
 # ============================================================================
-# VÍ DỤ SỬ DỤNG
+# USAGE EXAMPLES
 # ============================================================================
 
 if __name__ == "__main__":
@@ -299,7 +284,7 @@ if __name__ == "__main__":
     print("CUSTOM REWARD WRAPPER - EXAMPLES")
     print("=" * 70)
     
-    print("\n1. Sử dụng CustomRewardWrapper (Đơn giản):")
+    print("\n1. Using CustomRewardWrapper (Simple):")
     print("-" * 70)
     print("""
     from custom_rewards import create_mario_env_with_custom_reward
@@ -311,7 +296,7 @@ if __name__ == "__main__":
     )
     """)
     
-    print("\n2. Sử dụng DetailedRewardWrapper (Nâng cao):")
+    print("\n2. Using DetailedRewardWrapper (Advanced):")
     print("-" * 70)
     print("""
     custom_config = {
@@ -328,12 +313,12 @@ if __name__ == "__main__":
     )
     """)
     
-    print("\n3. Tùy chỉnh trong CustomRewardWrapper:")
+    print("\n3. Customizing in CustomRewardWrapper:")
     print("-" * 70)
     print("""
-    # Mở file custom_rewards.py và sửa các giá trị:
+    # Open the custom_rewards.py file and edit the values:
     
-    self.speed_reward_multiplier = 1.0  # Tăng để thưởng nhiều hơn
-    self.death_penalty = -100          # Tăng để phạt nặng hơn
-    self.idle_penalty = -0.5           # Tăng để phạt đứng yên nhiều hơn
+    self.speed_reward_multiplier = 1.0  # Increase for a higher reward
+    self.death_penalty = -100          # Increase for a heavier penalty
+    self.idle_penalty = -0.5           # Increase to penalize being idle more
     """)

@@ -1,7 +1,3 @@
-"""
-Super Mario Bros AI Testing Script
-Kiểm thử các model đã huấn luyện với tùy chọn quay video
-"""
 
 import os
 import gym_super_mario_bros
@@ -14,23 +10,20 @@ from gym.wrappers import RecordVideo
 import glob
 
 # ============================================================================
-# CẤU HÌNH KIỂM THỬ - THAY ĐỔI TẠI ĐÂY
+# Select level to test - CHANGE HERE
 # ============================================================================
-WORLD = 1  # Phải khớp với màn đã train
-STAGE = 1  # Phải khớp với màn đã train
+WORLD = 1  # Must match trained world
+STAGE = 1  # Must match trained stage
 
-# Tùy chọn kiểm thử
-RECORD_VIDEO = True         # Có quay video không?
-NUM_EPISODES = 3            # Số lượt chơi
-RENDER_GAME = True          # Hiển thị game trong khi chơi
 
-# Chọn model để test (có thể thay đổi)
-# Để trống để tự động chọn model mới nhất, hoặc chỉ định đường dẫn cụ thể
-MODEL_PATH = None  # Ví dụ: "./train/1-1/best_model_100000" hoặc None
+RECORD_VIDEO = True         # Is recording video?
+NUM_EPISODES = 25           # Number of episodes to test
+RENDER_GAME = True          # Render the game during testing
 
-# ============================================================================
-# THIẾT LẬP THƯ MỤC
-# ============================================================================
+# choose model to test or None to select interactively
+MODEL_PATH = None  # ex: "./train/1-1/best_model_100000" hoặc None
+
+
 STAGE_NAME = f"{WORLD}-{STAGE}"
 CHECKPOINT_DIR = f"./train/{STAGE_NAME}/"
 VIDEO_DIR = f"./videos/{STAGE_NAME}/"
@@ -42,9 +35,9 @@ print(f"🎮 KIỂM THỬ AI CHO SUPER MARIO BROS - MÀN {STAGE_NAME}")
 print("=" * 70)
 
 # ============================================================================
-# CẤU HÌNH CUSTOM REWARD (PHẢI KHỚP VỚI TRAIN)
+# CUSTOM REWARD MUST MATCH TRAIN
 # ============================================================================
-USE_CUSTOM_REWARD = True  # Đặt False nếu train không dùng custom reward
+USE_CUSTOM_REWARD = True  # Use custom reward function?
 
 if USE_CUSTOM_REWARD:
     try:
@@ -54,7 +47,7 @@ if USE_CUSTOM_REWARD:
         USE_CUSTOM_REWARD = False
 
 # ============================================================================
-# HÀM TẠO MÔI TRƯỜNG
+# CREATE MARIO ENV
 # ============================================================================
 def create_mario_env(world, stage, record_video=False, video_folder=None):
     """
@@ -63,18 +56,18 @@ def create_mario_env(world, stage, record_video=False, video_folder=None):
     env_name = f'SuperMarioBros-{world}-{stage}-v0'
     env = gym_super_mario_bros.make(env_name)
     
-    # Nếu cần quay video, wrap trước khi apply các wrapper khác
+   
     if record_video and video_folder:
         env = RecordVideo(
             env,
             video_folder=video_folder,
-            episode_trigger=lambda x: True,  # Quay tất cả các episode
+            episode_trigger=lambda x: True,  
             name_prefix=f"mario_{STAGE_NAME}_test"
         )
     
     env = JoypadSpace(env, SIMPLE_MOVEMENT)
     
-    # Apply custom reward nếu cần (phải khớp với training)
+    
     if USE_CUSTOM_REWARD:
         env = CustomRewardWrapper(env)
     
@@ -85,29 +78,24 @@ def create_mario_env(world, stage, record_video=False, video_folder=None):
     return env
 
 # ============================================================================
-# HÀM TÌM MODEL
+# FIND OR LIST MODELS
 # ============================================================================
 def find_latest_model(checkpoint_dir):
-    """
-    Tìm model mới nhất trong thư mục checkpoint
-    """
-    # Tìm tất cả các file model
+    
     model_files = glob.glob(os.path.join(checkpoint_dir, "*.zip"))
     
     if not model_files:
         raise FileNotFoundError(
-            f"Không tìm thấy model nào trong {checkpoint_dir}\n"
-            f"Hãy chạy train_mario.py trước!"
+            f"Not found model in {checkpoint_dir}\n"
+            f"run train_mario.py before!"
         )
     
-    # Sắp xếp theo thời gian sửa đổi
+   
     latest_model = max(model_files, key=os.path.getmtime)
     return latest_model.replace('.zip', '')
 
 def list_available_models(checkpoint_dir):
-    """
-    Liệt kê tất cả các model có sẵn
-    """
+    
     model_files = glob.glob(os.path.join(checkpoint_dir, "*.zip"))
     
     if not model_files:
@@ -126,31 +114,29 @@ def list_available_models(checkpoint_dir):
     return models
 
 # ============================================================================
-# HÀM KIỂM THỬ
+# TEST MODEL FUNCTION
 # ============================================================================
 def test_model(model_path, num_episodes=3, render=True):
-    """
-    Kiểm thử model đã huấn luyện
-    """
-    print(f"\n📦 Đang tải model: {model_path}")
     
-    # Load model
+    print(f"\n📦 Loading model: {model_path}")
+    
+    
     try:
         model = PPO.load(model_path)
-        print("✅ Model đã được tải thành công!")
+        print("✅ Model load finish!")
     except Exception as e:
-        print(f"❌ Lỗi khi tải model: {e}")
+        print(f"❌ Error when load model: {e}")
         return
     
-    # Tạo môi trường
+    
     video_folder = VIDEO_DIR if RECORD_VIDEO else None
     env = create_mario_env(WORLD, STAGE, RECORD_VIDEO, video_folder)
     
     if RECORD_VIDEO:
-        print(f"🎬 Video sẽ được lưu tại: {VIDEO_DIR}")
+        print(f"🎬 Video will be save at: {VIDEO_DIR}")
     
-    # Chạy các episode
-    print(f"\n🎮 Bắt đầu chơi {num_episodes} lượt...")
+    
+    print(f"\n🎮 Started playing {num_episodes} time...")
     print("-" * 70)
     
     for episode in range(num_episodes):
@@ -175,39 +161,37 @@ def test_model(model_path, num_episodes=3, render=True):
                 env.render()
         
         # Thông tin kết quả
-        print(f"   ✓ Hoàn thành sau {steps} bước")
-        print(f"   🏆 Tổng điểm: {total_reward:.2f}")
+        print(f"   ✓ Completed later {steps} steps")
+        print(f"   🏆 Total reward: {total_reward:.2f}")
         
         if info[0].get('flag_get'):
-            print(f"   🚩 ĐÃ CẮM CỜ! Mario đã hoàn thành màn!")
+            print(f"   🚩 FLAG IS UP! Mario has completed the level!")
         else:
-            print(f"   💀 Mario đã chết hoặc hết thời gian")
+            print(f"   💀 Mario is dead or out of time")
     
     print("\n" + "=" * 70)
-    print("🎉 HOÀN THÀNH KIỂM THỬ!")
+    print("🎉 TEST COMPLETE!")
     
     if RECORD_VIDEO:
-        print(f"🎬 Video đã được lưu tại: {VIDEO_DIR}")
+        print(f"🎬 The video has been saved at: {VIDEO_DIR}")
     
     print("=" * 70)
     
     env.close()
 
 # ============================================================================
-# HÀM CHỌN MODEL TƯƠNG TÁC
+# INTERACTIVE MODEL SELECTION
 # ============================================================================
 def interactive_model_selection():
-    """
-    Cho phép người dùng chọn model từ danh sách
-    """
+    
     models = list_available_models(CHECKPOINT_DIR)
     
     if not models:
-        print(f"\n❌ Không tìm thấy model nào trong {CHECKPOINT_DIR}")
-        print("   Hãy chạy train_mario.py trước!")
+        print(f"\n❌ No model found in {CHECKPOINT_DIR}")
+        print("   Run train_mario.py first!")
         return None
     
-    print("\n📋 CÁC MODEL CÓ SẴN:")
+    print("\n📋 AVAILABLE MODELS:")
     print("-" * 70)
     for i, model in enumerate(models, 1):
         print(f"{i}. {model['name']} ({model['size_mb']} MB)")
@@ -215,60 +199,59 @@ def interactive_model_selection():
     
     while True:
         try:
-            choice = input(f"\nChọn model (1-{len(models)}) hoặc Enter để chọn mới nhất: ").strip()
+            choice = input(f"\nSelect model (1-{len(models)}) or Enter to select latest: ").strip()
             
             if choice == "":
-                # Chọn model mới nhất (cuối cùng trong list)
+                
                 return models[-1]['path']
             
             choice = int(choice)
             if 1 <= choice <= len(models):
                 return models[choice - 1]['path']
             else:
-                print(f"❌ Vui lòng chọn số từ 1 đến {len(models)}")
+                print(f"❌ Please select a number from 1 to {len(models)}")
         except ValueError:
-            print("❌ Vui lòng nhập số hợp lệ")
+            print("❌ Please enter a valid number")
         except KeyboardInterrupt:
-            print("\n\n⚠️  Đã hủy")
+            print("\n\n⚠️  Cancelled")
             return None
 
 # ============================================================================
-# CHẠY CHƯƠNG TRÌNH
+# RUN PROGRAM
 # ============================================================================
 if __name__ == "__main__":
     try:
-        # Tìm hoặc chọn model
         if MODEL_PATH is None:
-            print("\n🔍 Đang tìm model...")
+            print("\n🔍 Looking for model...")
             model_path = interactive_model_selection()
             
             if model_path is None:
-                print("\n❌ Không có model để test. Thoát...")
+                print("\n❌ No model to test. Exit...")
                 exit(1)
         else:
             model_path = MODEL_PATH
             
             if not os.path.exists(model_path + '.zip'):
-                print(f"\n❌ Model không tồn tại: {model_path}")
-                print("   Vui lòng kiểm tra lại đường dẫn!")
+                print(f"\n❌ Model does not exist: {model_path}")
+                print("   Please check the link again!")
                 exit(1)
         
         # Hiển thị cấu hình
-        print(f"\n⚙️  CẤU HÌNH KIỂM THỬ:")
-        print(f"   - Màn chơi: {STAGE_NAME}")
+        print(f"\n⚙️  TEST CONFIGURATION:")
+        print(f"   - Level: {STAGE_NAME}")
         print(f"   - Model: {os.path.basename(model_path)}")
-        print(f"   - Số lượt: {NUM_EPISODES}")
-        print(f"   - Quay video: {'Có' if RECORD_VIDEO else 'Không'}")
-        print(f"   - Hiển thị: {'Có' if RENDER_GAME else 'Không'}")
+        print(f"   - Num steps: {NUM_EPISODES}")
+        print(f"   - Record video: {'yes' if RECORD_VIDEO else 'No'}")
+        print(f"   - Display: {'Yes' if RENDER_GAME else 'No'}")
         
         # Xác nhận
-        input("\n▶️  Nhấn Enter để bắt đầu kiểm thử...")
+        input("\n▶️  Press Enter to start testing...")
         
         # Chạy test
         test_model(model_path, NUM_EPISODES, RENDER_GAME)
         
     except KeyboardInterrupt:
-        print("\n\n⚠️  Kiểm thử bị gián đoạn bởi người dùng")
+        print("\n\n⚠️  Test interrupted by user")
     except Exception as e:
-        print(f"\n\n❌ Lỗi: {e}")
+        print(f"\n\n❌ Error: {e}")
         raise
