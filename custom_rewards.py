@@ -1,7 +1,5 @@
-
 import gym
 import numpy as np
-
 
 class CustomRewardWrapper(gym.Wrapper):
     """
@@ -19,13 +17,8 @@ class CustomRewardWrapper(gym.Wrapper):
     - Heavier penalty for dying
     - Slight penalty for standing still or moving slowly
     """
-    # ================================================================
-    # CUSTOM REWARD CONFIGURATION - CUSTOMIZE HERE
-    # ================================================================   
     def __init__(self, env):
         super(CustomRewardWrapper, self).__init__(env)
-        
-
         
         # Reward for moving fast
         self.speed_reward_multiplier = 0.5  
@@ -47,7 +40,6 @@ class CustomRewardWrapper(gym.Wrapper):
         self.max_x_pos = 0  
         
     def reset(self, **kwargs):
-        
         obs = self.env.reset(**kwargs)
         self.prev_x_pos = 0
         self.prev_time = 400
@@ -56,7 +48,6 @@ class CustomRewardWrapper(gym.Wrapper):
         return obs
     
     def step(self, action):
-        
         obs, reward, done, info = self.env.step(action)
         
         # Get information from the game
@@ -64,9 +55,6 @@ class CustomRewardWrapper(gym.Wrapper):
         current_time = info.get('time', 400)
         is_dead = info.get('life', 2) < 2  # A decrease in life means death
         
-        # ============================================================
-        # CALCULATE CUSTOM REWARD
-        # ============================================================
         custom_reward = 0
         
         # 1. REWARD FOR MOVING QUICKLY TO THE RIGHT
@@ -104,16 +92,12 @@ class CustomRewardWrapper(gym.Wrapper):
         time_penalty = -0.01 if current_time < self.prev_time else 0
         custom_reward += time_penalty
         
-        # ============================================================
-        # COMBINE ORIGINAL REWARD AND CUSTOM REWARD
-        # ============================================================
         final_reward = reward + custom_reward
         
         # Update tracking variables
         self.prev_x_pos = current_x_pos
         self.prev_time = current_time
         
-        # Debug info (optional - comment out if not needed)
         info['custom_reward'] = custom_reward
         info['original_reward'] = reward
         info['x_delta'] = x_delta
@@ -125,32 +109,25 @@ class DetailedRewardWrapper(gym.Wrapper):
     def __init__(self, env, config=None):
         super(DetailedRewardWrapper, self).__init__(env)
         
-        
         default_config = {
-            # Movement rewards
-            'right_movement_bonus': 1.0,      # Bonus for moving right
-            'fast_movement_bonus': 2.0,       # Bonus for moving very fast
-            'fast_threshold': 10,             # Threshold to be considered "fast"
+            'right_movement_bonus': 1.0,      
+            'fast_movement_bonus': 2.0,       
+            'fast_threshold': 10,             
             
-            # Penalties
-            'death_penalty': -100,            # Penalty for dying
-            'idle_penalty': -0.5,             # Penalty for being idle
-            'backward_penalty': -1.0,         # Penalty for moving backward
-            'time_penalty': -0.01,            # Penalty over time
+            'death_penalty': -100,            
+            'idle_penalty': -0.5,             
+            'backward_penalty': -1.0,         
+            'time_penalty': -0.01,            
             
-            # Progress rewards
-            'new_area_bonus': 5.0,            # Bonus for reaching a new area
-            'checkpoint_bonus': 10.0,         # Bonus at checkpoints
+            'new_area_bonus': 5.0,            
+            'checkpoint_bonus': 10.0,         
             
-            # Thresholds
-            'idle_threshold': 1,              # Threshold to be considered idle
-            'stuck_threshold': 50,            # Number of frames to be considered "stuck"
+            'idle_threshold': 1,              
+            'stuck_threshold': 50,            
         }
         
-        # Merge with user config
         self.config = {**default_config, **(config or {})}
         
-        # Tracking
         self.prev_x_pos = 0
         self.max_x_pos = 0
         self.stuck_counter = 0
@@ -172,59 +149,45 @@ class DetailedRewardWrapper(gym.Wrapper):
         is_dead = info.get('life', 2) < 2
         
         custom_reward = 0
-        
-        # Movement analysis
         x_delta = current_x_pos - self.prev_x_pos
         
-        # Right movement rewards
         if x_delta > 0:
             custom_reward += self.config['right_movement_bonus']
             self.stuck_counter = 0
             
-            # Fast movement bonus
             if x_delta >= self.config['fast_threshold']:
                 custom_reward += self.config['fast_movement_bonus']
             
-            # New area bonus
             if current_x_pos > self.max_x_pos:
                 progress = current_x_pos - self.max_x_pos
-                custom_reward += progress * 0.1  # Small bonus for progress
+                custom_reward += progress * 0.1  
                 self.max_x_pos = current_x_pos
                 
-                # Checkpoint bonus (every 100 pixels)
                 if self.max_x_pos % 100 < progress:
                     custom_reward += self.config['checkpoint_bonus']
         
-        # Backward movement penalty
         elif x_delta < -self.config['idle_threshold']:
             custom_reward += self.config['backward_penalty']
         
-        # Idle penalty
         elif abs(x_delta) <= self.config['idle_threshold']:
             custom_reward += self.config['idle_penalty']
             self.stuck_counter += 1
             
-            # Escalating penalty for being stuck
             if self.stuck_counter > self.config['stuck_threshold']:
                 stuck_multiplier = (self.stuck_counter - self.config['stuck_threshold']) / 10
                 custom_reward += self.config['idle_penalty'] * stuck_multiplier
         
-        # Death penalty
         if is_dead:
             custom_reward += self.config['death_penalty']
         
-        # Time penalty (encourage fast completion)
         if current_time < self.prev_time:
             custom_reward += self.config['time_penalty']
         
-        # Final reward
         final_reward = reward + custom_reward
         
-        # Update tracking
         self.prev_x_pos = current_x_pos
         self.prev_time = current_time
         
-        # Enhanced info
         info['custom_reward'] = custom_reward
         info['original_reward'] = reward
         info['x_delta'] = x_delta
@@ -234,22 +197,9 @@ class DetailedRewardWrapper(gym.Wrapper):
         return obs, final_reward, done, info
 
 
-# ============================================================================
-# HELPER FUNCTION - Create an environment with custom rewards
-# ============================================================================
-
 def create_mario_env_with_custom_reward(world, stage, reward_type='custom', reward_config=None):
     """
     Creates a Mario environment with a custom reward wrapper.
-    
-    Args:
-        world: World number (1-8)
-        stage: Stage number (1-4)
-        reward_type: 'custom' or 'detailed'
-        reward_config: Dict for DetailedRewardWrapper configuration (optional)
-    
-    Returns:
-        env: The wrapped environment
     """
     import gym_super_mario_bros
     from nes_py.wrappers import JoypadSpace
@@ -261,13 +211,11 @@ def create_mario_env_with_custom_reward(world, stage, reward_type='custom', rewa
     env = gym_super_mario_bros.make(env_name)
     env = JoypadSpace(env, SIMPLE_MOVEMENT)
     
-    # Apply custom reward wrapper BEFORE grayscale
     if reward_type == 'custom':
         env = CustomRewardWrapper(env)
     elif reward_type == 'detailed':
         env = DetailedRewardWrapper(env, reward_config)
     
-    # Continue with preprocessing
     env = GrayScaleObservation(env, keep_dim=True)
     env = DummyVecEnv([lambda: env])
     env = VecFrameStack(env, 4, channels_order='last')
@@ -275,50 +223,14 @@ def create_mario_env_with_custom_reward(world, stage, reward_type='custom', rewa
     return env
 
 
-# ============================================================================
-# USAGE EXAMPLES
-# ============================================================================
-
 if __name__ == "__main__":
-    print("=" * 70)
     print("CUSTOM REWARD WRAPPER - EXAMPLES")
-    print("=" * 70)
     
-    print("\n1. Using CustomRewardWrapper (Simple):")
-    print("-" * 70)
-    print("""
-    from custom_rewards import create_mario_env_with_custom_reward
+    print("1. Using CustomRewardWrapper (Simple):")
+    print("...")
     
-    env = create_mario_env_with_custom_reward(
-        world=1, 
-        stage=1, 
-        reward_type='custom'
-    )
-    """)
+    print("2. Using DetailedRewardWrapper (Advanced):")
+    print("...")
     
-    print("\n2. Using DetailedRewardWrapper (Advanced):")
-    print("-" * 70)
-    print("""
-    custom_config = {
-        'right_movement_bonus': 2.0,
-        'death_penalty': -150,
-        'fast_threshold': 15,
-    }
-    
-    env = create_mario_env_with_custom_reward(
-        world=1, 
-        stage=1, 
-        reward_type='detailed',
-        reward_config=custom_config
-    )
-    """)
-    
-    print("\n3. Customizing in CustomRewardWrapper:")
-    print("-" * 70)
-    print("""
-    # Open the custom_rewards.py file and edit the values:
-    
-    self.speed_reward_multiplier = 1.0  # Increase for a higher reward
-    self.death_penalty = -100          # Increase for a heavier penalty
-    self.idle_penalty = -0.5           # Increase to penalize being idle more
-    """)
+    print("3. Customizing in CustomRewardWrapper:")
+    print("...")
